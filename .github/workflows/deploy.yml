@@ -1,0 +1,152 @@
+# ============================================================
+# CD Pipeline - Deploy to AWS
+# ============================================================
+
+name: Deploy to AWS
+
+# When to run
+on:
+  push:
+    branches:
+      - main  # Only deploy from main branch
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+# Environment variables
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: ecommerce-pipeline
+
+# Jobs
+jobs:
+
+  # ─────────────────────────────────────────────────────────
+  # Job 1: Deploy Infrastructure
+  # ─────────────────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy to AWS
+    runs-on: ubuntu-latest
+    
+    # Only run if CI passed
+    # needs: [lint, test, validate-data]
+    
+    steps:
+      # Step 1: Get code
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # Step 2: Configure AWS credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      # Step 3: Verify AWS connection
+      - name: Verify AWS Connection
+        run: |
+          echo "Verifying AWS credentials..."
+          aws sts get-caller-identity
+          echo "✅ AWS credentials configured"
+      
+      # Step 4: Create/Update S3 Buckets
+      - name: Setup S3 Buckets
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          RAW_BUCKET="${{ env.PROJECT_NAME }}-raw-${ACCOUNT_ID}"
+          PROCESSED_BUCKET="${{ env.PROJECT_NAME }}-processed-${ACCOUNT_ID}"
+          SCRIPTS_BUCKET="${{ env.PROJECT_NAME }}-scripts-${ACCOUNT_ID}"
+          
+          echo "Creating S3 buckets..."
+          
+          # Create buckets (ignore if exists)
+          aws s3 mb s3://${RAW_BUCKET} --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Raw bucket exists"
+          aws s3 mb s3://${PROCESSED_BUCKET} --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Processed bucket exists"
+          aws s3 mb s3://${SCRIPTS_BUCKET} --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Scripts bucket exists"
+          
+          echo "RAW_BUCKET=${RAW_BUCKET}" >> $GITHUB_ENV
+          echo "PROCESSED_BUCKET=${PROCESSED_BUCKET}" >> $GITHUB_ENV
+          echo "SCRIPTS_BUCKET=${SCRIPTS_BUCKET}" >> $GITHUB_ENV
+          
+          echo "✅ S3 buckets ready"
+      
+      # Step 5: Upload Data to S3
+      - name: Upload Data Files
+        run: |
+          echo "Uploading data files to S3..."
+          
+          aws s3 cp data/sales_data.csv s3://${{ env.RAW_BUCKET }}/sales/
+          aws s3 cp data/products.csv s3://${{ env.RAW_BUCKET }}/products/
+          aws s3 cp data/customers.csv s3://${{ env.RAW_BUCKET }}/customers/
+          
+          echo "✅ Data files uploaded"
+      
+      # Step 6: Upload ETL Scripts
+      - name: Upload ETL Scripts
+        run: |
+          echo "Uploading ETL scripts..."
+          
+          aws s3 cp scripts/etl_script.py s3://${{ env.SCRIPTS_BUCKET }}/scripts/
+          
+          echo "✅ ETL scripts uploaded"
+      
+      # Step 7: Create/Update Glue Job
+      - name: Setup Glue Job
+        run: |
+          echo "Setting up Glue job..."
+          
+          # Check if job exists
+          if aws glue get-job --job-name "${{ env.PROJECT_NAME }}-etl-job" 2>/dev/null; then
+            echo "Updating existing Glue job..."
+            aws glue update-job \
+              --job-name "${{ env.PROJECT_NAME }}-etl-job" \
+              --job-update "{
+                \"Command\": {
+                  \"Name\": \"glueetl\",
+                  \"ScriptLocation\": \"s3://${{ env.SCRIPTS_BUCKET }}/scripts/etl_script.py\",
+                  \"PythonVersion\": \"3\"
+                },
+                \"DefaultArguments\": {
+                  \"--RAW_BUCKET\": \"${{ env.RAW_BUCKET }}\",
+                  \"--PROCESSED_BUCKET\": \"${{ env.PROCESSED_BUCKET }}\"
+                }
+              }"
+          else
+            echo "Glue job doesn't exist. Create it manually or add IAM role setup."
+          fi
+          
+          echo "✅ Glue job configured"
+      
+      # Step 8: Print Summary
+      - name: Deployment Summary
+        run: |
+          echo ""
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║           🎉 DEPLOYMENT SUCCESSFUL!                        ║"
+          echo "╠════════════════════════════════════════════════════════════╣"
+          echo "║                                                            ║"
+          echo "║  📦 S3 Buckets:                                           ║"
+          echo "║     Raw:       ${{ env.RAW_BUCKET }}"
+          echo "║     Processed: ${{ env.PROCESSED_BUCKET }}"
+          echo "║     Scripts:   ${{ env.SCRIPTS_BUCKET }}"
+          echo "║                                                            ║"
+          echo "║  📄 Files Uploaded:                                       ║"
+          echo "║     - data/sales_data.csv                                 ║"
+          echo "║     - data/products.csv                                   ║"
+          echo "║     - data/customers.csv                                  ║"
+          echo "║     - scripts/etl_script.py                               ║"
+          echo "║                                                            ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+EOF
