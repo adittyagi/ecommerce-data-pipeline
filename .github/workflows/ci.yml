@@ -161,4 +161,3 @@ jobs:
           fi
           
           echo "✅ No obvious secrets found"
-EOF
