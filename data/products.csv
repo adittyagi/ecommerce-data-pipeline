@@ -1,0 +1,6 @@
+product_id,product_name,category,brand,cost_price
+PROD001,Wireless Mouse,Electronics,TechBrand,12.50
+PROD002,USB Cable,Electronics,CableCo,8.00
+PROD003,Bluetooth Headphones,Electronics,SoundMax,65.00
+PROD004,Laptop Stand,Accessories,ErgoDesk,25.00
+PROD005,Webcam HD,Electronics,VisionTech,40.00

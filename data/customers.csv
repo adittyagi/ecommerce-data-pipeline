@@ -1,0 +1,12 @@
+customer_id,first_name,last_name,email,registration_date,customer_segment
+CUST101,John,Smith,john.smith@email.com,2023-06-15,Premium
+CUST102,Sarah,Johnson,sarah.j@email.com,2023-07-20,Regular
+CUST103,Michael,Williams,m.williams@email.com,2023-08-10,Premium
+CUST104,Emily,Brown,emily.b@email.com,2023-09-05,Regular
+CUST105,David,Jones,d.jones@email.com,2023-10-12,New
+CUST106,Lisa,Garcia,lisa.g@email.com,2023-11-08,Regular
+CUST107,Robert,Miller,r.miller@email.com,2023-12-01,New
+CUST108,Jennifer,Davis,j.davis@email.com,2024-01-03,New
+CUST109,William,Rodriguez,w.rodriguez@email.com,2024-01-10,New
+CUST110,Amanda,Martinez,a.martinez@email.com,2024-01-12,New
+CUST111,Christopher,Anderson,c.anderson@email.com,2024-01-15,New
